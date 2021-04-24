@@ -92,10 +92,20 @@ commands.set('reveal', {
       return;
     }
     let result = "";
-    game.players.forEach((player) =>
-      result += `<@${player.user}>: ${player.location}\n`
-    );
+    let caught = false;
+    let bossLoc: Location | undefined = undefined;
+    game.players.forEach((player) => {
+      if (player.role === Role.Boss) bossLoc = player.location;
+      result += `<@${player.user}>: ${player.location}\n`;
+    });
+    game.players.forEach((player) => {
+      if (player.role === Role.Member || player.role === Role.Traitor && player.location === bossLoc) game!.visits += 1;
+      if (player.role === Role.Police && player.location === bossLoc) caught = true;
+    });
     message.channel.send(result);
+    message.channel.send(`visits: ${game.visits}`);
+    if (caught) message.channel.send('The boss is caught by the police');
+    else if (game.visits >= 4) message.channel.send('The boss successfully run away');
   },
 });
 
@@ -140,7 +150,9 @@ function timer(timerCount: number, message: Message) {
     setTimeout(timer, 30000, timerCount - 30, message);
   } else if (timerCount <= 30 && timerCount > 10) {
     setTimeout(timer, 10000, timerCount - 10, message);
-  } else if (timerCount <= 10 && timerCount > 2) {
+  } else if (timerCount <= 10 && timerCount > 0) {
     setTimeout(timer, 2000, timerCount - 2, message);
+  } else {
+    // reveal
   }
 }

@@ -36,9 +36,11 @@ class Player {
 export class Game {
   channel: Channel;
   players: Map<string, Player>;
+  visits: number;
   constructor(channel: Channel) {
     this.channel = channel;
     this.players = new Map();
+    this.visits = 0;
   }
 
   addPlayer(user: string, role: Role) {
