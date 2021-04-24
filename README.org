@@ -1,4 +1,5 @@
 * Where's the Boss Discord Helper Bot
+Check the rulebook here: https://igaryhe.itch.io/wheres-the-boss
 ** Setup
    - set envvar ~BOT_TOKEN~ to your bot token.
    - ~deno run --allow-env --allow-net main.ts~
