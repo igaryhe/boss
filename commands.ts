@@ -7,138 +7,120 @@ const playerCount = 2;
 let game: Game | undefined = undefined;
 
 interface Command {
-  name: string,
   description: string,
   execute: (message: Message, args: Array<string>) => void
 }
+export const commands: Map<string, Command> = new Map();
 
-export const commands: Array<Command> = [
-  {
-    name: "ping",
-    description: "ping the bot",
-    execute(message: Message, _args: Array<string>) {
-      message.channel?.send("pong");
-    },
+commands.set('start', {
+  description: "start the game",
+  execute(message: Message, _args: Array<string>) {
+    if (message.channel?.type != 0) {
+      message.channel?.send("Must start the game in a text channel");
+    } else {
+      game = new Game(message.channel);
+      message.channel.send("Please assign roles to players");
+    }
   },
-  {
-    name: "echo",
-    description: "repeater",
-    execute(message: Message, args: Array<string>) {
-      message.channel?.send(args[0]);
-    },
+});
+commands.set('assign', {
+  description: "assign roles to everyone mentioned",
+  execute(message: Message, _args: Array<string>) {
+    if (game == undefined) {
+      message.channel?.send("You need to start the game first.");
+      return;
+    }
+    if (message.channel?.id != game.channel.id) {
+      message.channel?.send("You are in the wrong channel");
+    }
+    const assigns = shuffle(roles);
+    if (message.mentions.length != playerCount) {
+      message.channel?.send("Invalid user amount.");
+    } else {
+      let i = 0;
+      message.mentions.forEach((user) => {
+        sendDirectMessage(user, `You are the ${Role[assigns[i]]}`);
+        game?.addPlayer(user, assigns[i]);
+        if (assigns[i] == Role.Boss) {
+          game?.channel.send(`<@${user}> is the Boss.`);
+        }
+        if (assigns[i] == Role.Police) {
+          game?.channel.send(`<@${user}> is the Police.`);
+        }
+        i++;
+      });
+    }
   },
-  {
-    name: "start",
-    description: "start the game",
-    execute(message: Message, _args: Array<string>) {
-      if (message.channel?.type != 0) {
-        message.channel?.send("Must start the game in a text channel");
-      } else {
-        game = new Game(message.channel);
-        message.channel.send("Please assign roles to players");
-      }
-    },
+});
+
+commands.set('goto', {
+  description: "goto a place",
+  execute(message: Message, args: Array<string>) {
+    if (game == undefined) {
+      message.channel?.send("You need to start the game first");
+      return;
+    }
+    if (message.channel?.type != 1) {
+      message.channel?.send("You could only set location in a DM channel");
+      return;
+    }
+    const player = game.players.get(message.author.id);
+    if (player == undefined) {
+      message.channel.send("You are not in the game right now.");
+      return;
+    }
+    if (args.length > 1) {
+      message.channel.send("Too many arguments");
+      return;
+    }
+    if (Object.values(Location).some((loc: string) => loc === args[0])) {
+      player.goto(<Location> args[0]);
+      message.channel.send("Done!");
+    } else message.channel.send('Invalid place');
   },
-  {
-    name: "assign",
-    description: "assign roles to everyone mentioned",
-    execute(message: Message, _args: Array<string>) {
-      if (game == undefined) {
-        message.channel?.send("You need to start the game first.");
-        return;
-      }
-      if (message.channel?.id != game.channel.id) {
-        message.channel?.send("You are in the wrong channel");
-      }
-      const assigns = shuffle(roles);
-      if (message.mentions.length != playerCount) {
-        message.channel?.send("Invalid user amount.");
-      } else {
-        let i = 0;
-        message.mentions.forEach((user) => {
-          sendDirectMessage(user, `You are the ${Role[assigns[i]]}`);
-          game?.addPlayer(user, assigns[i]);
-          if (assigns[i] == Role.Boss) {
-            game?.channel.send(`<@${user}> is the Boss.`);
-          }
-          if (assigns[i] == Role.Police) {
-            game?.channel.send(`<@${user}> is the Police.`);
-          }
-          i++;
-        });
-      }
-    },
+});
+
+commands.set('reveal', {
+  description: "reveal locations",
+  execute(message: Message, _args: Array<string>) {
+    if (game == undefined) {
+      message.channel?.send("You need to start the game first");
+      return;
+    }
+    if (message.channel?.id != game.channel.id) {
+      message.channel?.send("You are in the wrong channel");
+      return;
+    }
+    let result = "";
+    game.players.forEach((player) =>
+      result += `<@${player.user}>: ${player.location}\n`
+    );
+    message.channel.send(result);
   },
-  {
-    name: "goto",
-    description: "goto a place",
-    execute(message: Message, args: Array<string>) {
-      if (game == undefined) {
-        message.channel?.send("You need to start the game first");
-        return;
-      }
-      if (message.channel?.type != 1) {
-        message.channel?.send("You could only set location in a DM channel");
-        return;
-      }
-      const player = game.players.get(message.author.id);
-      if (player == undefined) {
-        message.channel.send("You are not in the game right now.");
-        return;
-      }
-      if (args.length > 1) {
-        message.channel.send("Too many arguments");
-        return;
-      }
-      if (Object.values(Location).some((loc: string) => loc === args[0])) {
-        player.goto(<Location> args[0]);
-        message.channel.send("Done!");
-      } else message.channel.send('Invalid place');
-    },
+});
+
+commands.set('stop', {
+  description: "stop the game",
+  execute(message: Message, _args: Array<string>) {
+    if (game == undefined) {
+      message.channel?.send("You need to start the game first");
+      return;
+    }
+    if (message.channel?.id != game.channel.id) {
+      message.channel?.send("You are in the wrong channel");
+      return;
+    }
+    game = undefined;
   },
-  {
-    name: "reveal",
-    description: "reveal locations",
-    execute(message: Message, _args: Array<string>) {
-      if (game == undefined) {
-        message.channel?.send("You need to start the game first");
-        return;
-      }
-      if (message.channel?.id != game.channel.id) {
-        message.channel?.send("You are in the wrong channel");
-        return;
-      }
-      let result = "";
-      game.players.forEach((player) =>
-        result += `<@${player.user}>: ${player.location}\n`
-      );
-      message.channel.send(result);
-    },
+});
+
+commands.set('timer', {
+  description: "start a timer",
+  execute(message: Message, args: Array<string>) {
+    const timerCount = parseInt(args[0]);
+    timer(timerCount, message);
   },
-  {
-    name: "stop",
-    description: "stop the game",
-    execute(message: Message, _args: Array<string>) {
-      if (game == undefined) {
-        message.channel?.send("You need to start the game first");
-        return;
-      }
-      if (message.channel?.id != game.channel.id) {
-        message.channel?.send("You are in the wrong channel");
-        return;
-      }
-      game = undefined;
-    },
-  },
-  {
-    name: "timer",
-    description: "start a timer",
-    execute(message: Message, args: Array<string>) {
-      const timerCount = parseInt(args[0]);
-      timer(timerCount, message);
-    },
-  },
-];
+});
 
 function shuffle(array: Array<Role>) {
   let currentIndex = array.length, temporaryValue, randomIndex;
