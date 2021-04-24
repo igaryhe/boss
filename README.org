@@ -1,0 +1,10 @@
+* Where's the Boss Discord Helper Bot
+** Setup
+   - set envvar ~BOT_TOKEN~ to your bot token.
+   - ~deno run --allow-env --allow-net main.ts~
+** Usage
+   - ~!start~ to start the game.
+   - ~!assign~ to assign roles to players. This command accept 5 different user mentions as parameters.
+   - ~!goto~ to set your next location. This one is sent in DM chat, and it accept 1 parameter from the following values: ~bridge~, ~aurora~, ~grass~, ~beach~, ~space~.
+   - ~!reveal~ is going to reveal everyone's location.
+   - ~!timer~ is used as a timer. This command accept one parameter as the length in seconds for the timer.
