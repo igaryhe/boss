@@ -64,7 +64,7 @@ commands.set("reveal", {
 
 commands.set("timer", {
   description: "start a timer",
-  dispatcher: new Dispatcher<Context>(timer),
+  dispatcher: new Dispatcher<Context>(argLength, timer),
 });
 
 function shuffle(array: Array<Role>) {
@@ -82,11 +82,11 @@ function shuffle(array: Array<Role>) {
 function timerEx(timerCount: number, message: Message) {
   message.channel?.send(`${timerCount} seconds remain.`);
   if (timerCount > 30) {
-    setTimeout(timer, 30000, timerCount - 30, message);
+    setTimeout(timerEx, 30000, timerCount - 30, message);
   } else if (timerCount <= 30 && timerCount > 10) {
-    setTimeout(timer, 10000, timerCount - 10, message);
+    setTimeout(timerEx, 10000, timerCount - 10, message);
   } else if (timerCount <= 10 && timerCount > 0) {
-    setTimeout(timer, 2000, timerCount - 2, message);
+    setTimeout(timerEx, 2000, timerCount - 2, message);
   } else {
     // reveal
   }
@@ -200,6 +200,11 @@ function reveal(ctx: Context, next: Next) {
     ctx.message.channel?.send("The boss successfully run away");
   }
   return next();
+}
+
+function argLength(ctx: Context, next: Next) {
+  if (ctx.args.length >= 1) next();
+  else ctx.message.channel?.send('Invalid argument');
 }
 
 function timer(ctx: Context, next: Next) {
