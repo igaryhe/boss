@@ -67,6 +67,11 @@ commands.set("timer", {
   dispatcher: new Dispatcher<Context>(argLength, timer),
 });
 
+commands.set('history', {
+  description: 'history',
+  dispatcher: new Dispatcher<Context>(checkGame, history),
+})
+
 function shuffle(array: Array<Role>) {
   let currentIndex = array.length, temporaryValue, randomIndex;
   while (0 !== currentIndex) {
@@ -178,11 +183,12 @@ function reveal(ctx: Context, next: Next) {
   let result = "";
   let caught = false;
   let bossLoc: Location | undefined = undefined;
+  game?.updateHistory();
   game?.players.forEach((player) => {
     if (player.role === Role.Boss) bossLoc = player.location;
     result += `<@${player.user}>: ${player.location}\n`;
   });
-  game?.players.forEach((player) => {
+  game?.players.forEach(player => {
     if (
       player.role === Role.Member ||
       player.role === Role.Traitor && player.location === bossLoc
@@ -196,8 +202,10 @@ function reveal(ctx: Context, next: Next) {
   ctx.message.channel?.send(result);
   ctx.message.channel?.send(`visits: ${game?.visits}`);
   if (caught) ctx.message.channel?.send("The boss is caught by the police");
-  else if (game!.visits >= 4) {
+  else if (game!.history.length <= 3 && game!.visits >= 4) {
     ctx.message.channel?.send("The boss successfully run away");
+  } else if (game!.history.length == 3 && game!.visits < 4) {
+    ctx.message.channel?.send('The boss failed to escape');
   }
   return next();
 }
@@ -211,4 +219,18 @@ function timer(ctx: Context, next: Next) {
   const timerCount = parseInt(ctx.args[0]);
   timerEx(timerCount, ctx.message);
   return next();
+}
+
+function history(ctx: Context, next: Next) {
+  if (game?.history.length) {
+    let round = 1;
+    game.history.forEach(players => {
+      let result = "";
+      players.forEach(player => result += `<@${player.user}>: ${player.location}\n`);
+      ctx.message.channel?.send(`Round ${round}`);
+      ctx.message.channel?.send(result);
+      round++;
+    });
+    return next();
+  } else ctx.message.channel?.send('No history');
 }

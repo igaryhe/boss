@@ -37,14 +37,20 @@ export class Game {
   channel: Channel;
   players: Map<string, Player>;
   visits: number;
+  history: Map<string, Player>[];
   constructor(channel: Channel) {
     this.channel = channel;
     this.players = new Map();
     this.visits = 0;
+    this.history = [];
   }
 
   addPlayer(user: string, role: Role) {
     const player = new Player(user, role);
     this.players.set(user, player);
+  }
+
+  updateHistory() {
+    this.history.push(this.players);
   }
 }
