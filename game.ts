@@ -1,4 +1,4 @@
-import { Channel } from "https://deno.land/x/discordeno/mod.ts";
+import { Channel } from "./deps.ts";
 
 export enum Location {
   Bridge = "bridge",
