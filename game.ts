@@ -1,11 +1,9 @@
-import { Channel } from "./deps.ts";
-
 export enum Location {
-  Bridge = "bridge",
-  Grass = "grass",
-  Aurora = "aurora",
-  Space = "space",
-  Beach = "beach",
+  Airport = "airport",
+  Bar = "bar",
+  Casino = "casino",
+  Hotel = "hotel",
+  Villa = "villa",
 }
 
 export enum Role {
@@ -18,7 +16,7 @@ export enum Role {
 class Player {
   user: string;
   role: Role;
-  location: Location | undefined;
+  location?: Location;
   constructor(user: string, role: Role) {
     this.user = user;
     this.role = role;
@@ -34,15 +32,19 @@ class Player {
 }
 
 export class Game {
-  channel: Channel;
+  channel: string;
   players: Map<string, Player>;
   visits: number;
   history: Map<string, Player>[];
-  constructor(channel: Channel) {
+  barrier?: Location;
+  hasSetBarrier: boolean;
+
+  constructor(channel: string) {
     this.channel = channel;
     this.players = new Map();
     this.visits = 0;
     this.history = [];
+    this.hasSetBarrier = false;
   }
 
   addPlayer(user: string, role: Role) {

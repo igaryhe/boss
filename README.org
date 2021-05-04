@@ -1,11 +1,16 @@
 * Where's the Boss Discord Helper Bot
-Check the rulebook here: https://igaryhe.itch.io/wheres-the-boss
+Checkout the rulebook here: https://igaryhe.itch.io/wheres-the-boss
 ** Setup
-   - set envvar ~BOT_TOKEN~ to your bot token.
+   - set the environment variable ~BOT_TOKEN~ to your bot token.
    - ~deno run --allow-env --allow-net main.ts~
 ** Usage
+*** Commands used in a text channel
    - ~!start~ to start the game.
-   - ~!assign~ to assign roles to players. This command accept 5 different user mentions as parameters.
-   - ~!goto~ to set your next location. This one is sent in DM chat, and it accept 1 parameter from the following values: ~bridge~, ~aurora~, ~grass~, ~beach~, ~space~.
-   - ~!reveal~ is going to reveal everyone's location.
-   - ~!timer~ is used as a timer. This command accept one parameter as the length in seconds for the timer.
+   - ~!stop~ to stop the game.
+   - ~!restart~ to restart the game.
+   - ~!assign <@player1> ...~ to assign roles to players. This command accept 5 different user mentions as parameters.
+   - ~!reveal~ to reveal everyone's location.
+   - ~!timer <seconds>~ to start a timer. This command accepts one parameter as the length in seconds for the timer.
+*** Commands used in a DM chat with bot
+   - ~!goto <place>~ to set your next location. This command accepts 1 parameter from the following values: ~airport~, ~bar~, ~casino~, ~hotel~, ~villa~.
+   - ~!barrier <place>~ to set a barrier at a location. This command accepts 1 parameter from the following values: ~airport~, ~bar~, ~casino~, ~hotel~, ~villa~
