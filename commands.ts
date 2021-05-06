@@ -1,4 +1,4 @@
-import { Message, sendDirectMessage } from "./deps.ts";
+import { Message, Embed, EmbedField, sendDirectMessage, cache } from "./deps.ts";
 import { Game, Location, Role } from "./game.ts";
 import { roles } from "./config.ts";
 import { Dispatcher, Next } from "./middleware.ts";
@@ -199,7 +199,8 @@ function clear(_ctx: Context, next: Next) {
 */
 
 function reveal(ctx: Context, next: Next) {
-  let result = "";
+  const embed: Embed = {title: "Result", description: ""};
+  const fields: EmbedField[] = [];
   let caught = false;
   let bossLoc: Location | undefined = undefined;
 
@@ -207,7 +208,11 @@ function reveal(ctx: Context, next: Next) {
 
   game?.players.forEach((player) => {
     if (player.role === Role.Boss) bossLoc = player.location;
-    result += `<@${player.user}>:\t\`${player.location}\`\n`;
+    fields.push({
+      name: `${cache.members.get(player.user)?.username}`,
+      value: `${player.location}`,
+      inline: true
+    });
   });
 
   game?.players.forEach((player) => {
@@ -218,22 +223,23 @@ function reveal(ctx: Context, next: Next) {
     }
   });
 
-  ctx.message.send(result);
+  fields.push({name: "visits", value: `${game?.visits}`, inline: true});
+
+  if (caught) embed.description = "The boss is caught by the police\n";
+  else if (game!.history.length <= 3 && game!.visits >= 4) {
+    embed.description = "The boss successfully escaped\n";
+  } else if (game!.history.length == 3 && game!.visits < 4) {
+    embed.description = "The boss failed to escape\n";
+  }
 
   if (game?.barrier !== undefined) {
-    ctx.message.send(`The barrier is set at \`${game.barrier}\``);
     game!.hasSetBarrier = true;
     game!.barrier = undefined;
+    embed.description += `The barrier is set at ${game.barrier}`;
   }
 
-  ctx.message.send(`visits: ${game?.visits}`);
-
-  if (caught) ctx.message.send("The boss is caught by the police");
-  else if (game!.history.length <= 3 && game!.visits >= 4) {
-    ctx.message.send("The boss successfully escaped");
-  } else if (game!.history.length == 3 && game!.visits < 4) {
-    ctx.message.send("The boss failed to escape");
-  }
+  embed.fields = fields;
+  ctx.message.send({embed: embed});
 
   return next();
 }
@@ -250,6 +256,7 @@ function timer(ctx: Context, next: Next) {
 }
 
 function history(ctx: Context, next: Next) {
+  const embed: Embed = {title: "Result", description: ""};
   if (game?.history.length) {
     let round = 1;
     game.history.forEach((players) => {
