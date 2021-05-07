@@ -32,14 +32,14 @@ class Player {
 }
 
 export class Game {
-  channel: string;
+  channel: bigint;
   players: Map<string, Player>;
   visits: number;
   history: Map<string, Player>[];
   barrier?: Location;
   hasSetBarrier: boolean;
 
-  constructor(channel: string) {
+  constructor(channel: bigint) {
     this.channel = channel;
     this.players = new Map();
     this.visits = 0;

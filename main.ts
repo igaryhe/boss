@@ -1,24 +1,19 @@
-import { startBot } from './deps.ts';
-import { commands } from './commands.ts';
-import { prefix } from './config.ts';
+import { startBot } from "./deps.ts";
+import { commands, registerCommands } from "./commands.ts";
 
 startBot({
   token: Deno.env.get("BOT_TOKEN")!,
-  intents: ["GUILDS", "GUILD_MESSAGES", "DIRECT_MESSAGES"],
+  intents: ["Guilds", "GuildMessages", "DirectMessages"],
   eventHandlers: {
-    ready() {
+    async ready() {
       console.log("ready");
+      await registerCommands(811924657426399253n);
     },
-    messageCreate(message) {
-      if (!message.content.startsWith(prefix) || message.author.bot) return;
-      const args = message.content.slice(prefix.length).trim().split(/ +/);
-      const command = args.shift()?.toLowerCase()!;
-      if (!commands.has(command)) return;
-      try {
-        commands.get(command)?.dispatcher.dispatch({message, args});
-      } catch (error) {
-        console.error(error);
-        message.reply('there was an error trying to execute that command!');
+    interactionCreate(interaction) {
+      const command = interaction.data?.name;
+      const pair = commands.get(command!);
+      if (pair !== undefined) {
+        commands.get(command!)?.dispatch(interaction);
       }
     },
   },

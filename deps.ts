@@ -1,2 +1,21 @@
-export { startBot, sendDirectMessage, cache, createSlashCommand } from "https://deno.land/x/discordeno/mod.ts";
-export type { Message, Channel, Embed, EmbedField, SlashCommandOption } from "https://deno.land/x/discordeno/mod.ts";
+export {
+  cache,
+  createSlashCommand,
+  getSlashCommands,
+  sendDirectMessage,
+  startBot,
+  sendMessage,
+  DiscordApplicationCommandOptionTypes,
+  DiscordInteractionResponseTypes,
+  sendInteractionResponse,
+  deleteSlashCommand,
+} from "https://raw.githubusercontent.com/discordeno/discordeno/main/mod.ts";
+export type {
+  Channel,
+  Embed,
+  EmbedField,
+  Message,
+  DiscordenoInteractionResponse,
+  Interaction,
+  ApplicationCommandInteractionDataOptionUser,
+} from "https://raw.githubusercontent.com/discordeno/discordeno/main/mod.ts";

@@ -1,205 +1,118 @@
-import { Message, Embed, EmbedField, sendDirectMessage, cache } from "./deps.ts";
+import {
+  ApplicationCommandInteractionDataOptionUser,
+  cache,
+  createSlashCommand,
+  DiscordApplicationCommandOptionTypes,
+  Embed,
+  EmbedField,
+  Interaction,
+  sendDirectMessage,
+  getSlashCommands,
+  sendInteractionResponse,
+  DiscordInteractionResponseTypes
+} from "./deps.ts";
 import { Game, Location, Role } from "./game.ts";
 import { roles } from "./config.ts";
 import { Dispatcher, Next } from "./middleware.ts";
 
 let game: Game | undefined = undefined;
 
-export interface Context {
-  message: Message;
-  args: string[];
-}
+export const commands: Map<string, Dispatcher<Interaction>> = new Map();
 
-interface Command {
-  description: string;
-  dispatcher: Dispatcher<Context>;
-}
+commands.set("start", new Dispatcher<Interaction>(checkTextChannel, start));
+commands.set("stop", new Dispatcher<Interaction>(checkGame, stop));
+commands.set("restart", new Dispatcher<Interaction>(checkGame, restart));
+commands.set("assign", new Dispatcher<Interaction>(checkGame, assign));
+commands.set(
+  "reveal",
+  new Dispatcher<Interaction>(checkGame, checkPlayer, reveal),
+);
+// commands.set("timer", new Dispatcher<Interaction>(argLength, timer));
+commands.set("history", new Dispatcher<Interaction>(checkGame, history));
+commands.set("goto", new Dispatcher<Interaction>(checkGame, checkPlayer, goto));
+commands.set(
+  "barrier",
+  new Dispatcher<Interaction>(checkGame, checkPlayer, checkPolice, barrier),
+);
 
-export const commands: Map<string, Command> = new Map();
-
-commands.set("help", {
-  description: "!help",
-  dispatcher: new Dispatcher<Context>(help),
-});
-
-commands.set("start", {
-  description: "!start                   to start the game.",
-  dispatcher: new Dispatcher<Context>(checkTextChannel, start),
-});
-
-commands.set("stop", {
-  description: "!stop                    to stop the game.",
-  dispatcher: new Dispatcher<Context>(checkGame, checkChannel, stop),
-});
-
-commands.set("restart", {
-  description: "!restart                 to restart the game.",
-  dispatcher: new Dispatcher<Context>(checkGame, checkChannel, restart),
-});
-
-commands.set("assign", {
-  description:
-    "!assign <@player1> ...   to assign roles to players. This command accept 5 different user mentions as parameters.",
-  dispatcher: new Dispatcher<Context>(
-    checkGame,
-    checkTextChannel,
-    checkChannel,
-    assign,
-  ),
-});
-
-/*
-commands.set("clear", {
-  description: "clear locations",
-  dispatcher: new Dispatcher<Context>(
-    checkGame,
-    checkChannel,
-    checkPlayer,
-    clear,
-  ),
-});
-*/
-
-commands.set("reveal", {
-  description:
-    "!reveal                  to reveal everyone's location.",
-  dispatcher: new Dispatcher<Context>(
-    checkGame,
-    checkPlayer,
-    checkChannel,
-    reveal,
-  ),
-});
-
-commands.set("timer", {
-  description:
-    "!timer <seconds>         to start a timer. This command accepts one parameter as the length in seconds for the timer.",
-  dispatcher: new Dispatcher<Context>(argLength, timer),
-});
-
-commands.set("history", {
-  description: "!history                 to view the game history.",
-  dispatcher: new Dispatcher<Context>(checkGame, checkChannel, history),
-});
-
-/*
-commands.set("check", {
-  description: "check a player's role",
-  dispatcher: new Dispatcher<Context>(
-    checkGame,
-    checkPlayer,
-    checkDMChannel,
-    checkRole,
-  ),
-});
-*/
-
-commands.set("goto", {
-  description:
-    "!goto <place>            to set your next location. <place> could be the following values: airport, bar, casino, hotel, villa.",
-  dispatcher: new Dispatcher<Context>(
-    checkGame,
-    checkDMChannel,
-    checkPlayer,
-    goto,
-  ),
-});
-
-commands.set("barrier", {
-  description:
-    "!barrier <place>         to set a barrier at a location. <place> could be the following values: airport, bar, casino, hotel, villa.",
-  dispatcher: new Dispatcher<Context>(
-    checkGame,
-    checkPlayer,
-    checkDMChannel,
-    barrier,
-  ),
-});
-
-// middlewares
-function checkGame(ctx: Context, next: Next) {
-  if (game == undefined) ctx.message.send("You need to start the game first");
-  else return next();
-}
-
-function checkChannel(ctx: Context, next: Next) {
-  if (ctx.message.channel?.id != game?.channel) {
-    ctx.message.send("You are in the wrong channel");
+function checkGame(interaction: Interaction, next: Next) {
+  if (game == undefined) {
+    response(interaction, "You need to start the game first.");
+  } else if (interaction.channelId != game?.channel.toString()) {
+    response(interaction, "You are in the wrong channel.");
   } else return next();
 }
 
-function checkTextChannel(ctx: Context, next: Next) {
-  if (ctx.message.channel?.type != 0) {
-    ctx.message.send("You are not in a text channel");
+function checkTextChannel(interaction: Interaction, next: Next) {
+  if (interaction.user !== undefined) {
+    response(interaction, "You are not in a guild channel.");
   } else return next();
 }
 
-function checkDMChannel(ctx: Context, next: Next) {
-  if (ctx.message.channel?.type != 1) {
-    ctx.message.send("You are not in a DM channel");
-  } else return next();
-}
-
-function checkPlayer(ctx: Context, next: Next) {
-  const player = game?.players.get(ctx.message.author.id);
+function checkPlayer(interaction: Interaction, next: Next) {
+  const player = game?.players.get(interaction.member!.user.id);
   if (player == undefined) {
-    ctx.message.send("You are not in the game right now");
+    response(interaction, "You are not in the game right now");
   } else return next();
 }
 
-function start(ctx: Context, next: Next) {
-  game = new Game(ctx.message.channel!.id);
-  ctx.message.send("Please assign roles to players");
+function checkPolice(interaction: Interaction, next: Next) {
+  if (
+    game?.players.get(interaction.member!.user.id)?.role ===
+      Role.Police
+  ) {
+    return next();
+  } else response(interaction, "You are not the police.", true);
+}
+
+function start(interaction: Interaction, next: Next) {
+  game = new Game(BigInt(interaction.channelId));
+  response(interaction, "Please assign roles to players");
   return next();
 }
 
-function stop(_ctx: Context, next: Next) {
+function stop(interaction: Interaction, next: Next) {
   game = undefined;
+  response(interaction, "The game is stopped.");
   return next();
 }
 
-function restart(ctx: Context, next: Next) {
-  game = new Game(ctx.message.channel!.id);
+function restart(interaction: Interaction, next: Next) {
+  game = new Game(BigInt(interaction.channelId));
+  response(interaction, "Please assign roles to players");
   return next();
 }
 
-function assign(ctx: Context, next: Next) {
+function assign(interaction: Interaction, next: Next) {
   const assigns = shuffle(roles);
-  if (ctx.message.mentions.length != roles.length) {
-    ctx.message.send("Invalid user amount.");
-  } else {
-    let i = 0;
-    ctx.message.mentions.forEach((user) => {
-      sendDirectMessage(user, `You are the ${Role[assigns[i]]}`);
-      game?.addPlayer(user, assigns[i]);
-      if (assigns[i] == Role.Boss) ctx.message.send(`<@${user}> is the Boss.`);
-      if (assigns[i] == Role.Police) {
-        ctx.message.send(`<@${user}> is the Police.`);
-      }
-      i++;
-    });
-    return next();
-  }
-}
-
-function goto(ctx: Context, next: Next) {
-  const player = game?.players.get(ctx.message.author.id);
-  if (Object.values(Location).some((loc: string) => loc === ctx.args[0])) {
-    player?.goto(<Location> ctx.args[0]);
-    ctx.message.send(`You are in ${ctx.args[0]} right now`);
-    return next();
-  } else ctx.message.send("Invalid place");
-}
-
-/*
-function clear(_ctx: Context, next: Next) {
-  game?.players.forEach((player) => player.clear());
+  let i = 0;
+  let result = "";
+  interaction.data?.options?.forEach((option) => {
+    const user = option as ApplicationCommandInteractionDataOptionUser;
+    sendDirectMessage(user.value, `You are the ${Role[assigns[i]]}`);
+    game?.addPlayer(user.value.toString(), assigns[i]);
+    if (assigns[i] == Role.Boss) {
+      result += `<@${user.value}> is the Boss.\n`;
+    }
+    if (assigns[i] == Role.Police) {
+      result += `<@${user.value}> is the Police.\n`;
+    }
+    i++;
+  });
+  response(interaction, result);
   return next();
 }
-*/
 
-function reveal(ctx: Context, next: Next) {
-  const embed: Embed = {title: "Result", description: ""};
+function goto(interaction: Interaction, next: Next) {
+  const player = game?.players.get(interaction.member!.user.id);
+  const arg = interaction.data?.options![0].value as string;
+  player?.goto(<Location> arg);
+  response(interaction, `You are in ${arg} right now`, true);
+  return next();
+}
+
+function reveal(interaction: Interaction, next: Next) {
+  const embed: Embed = { title: "Result", description: "" };
   const fields: EmbedField[] = [];
   let caught = false;
   let bossLoc: Location | undefined = undefined;
@@ -209,9 +122,10 @@ function reveal(ctx: Context, next: Next) {
   game?.players.forEach((player) => {
     if (player.role === Role.Boss) bossLoc = player.location;
     fields.push({
-      name: `${cache.members.get(player.user)?.username}`,
-      value: `${player.location}`,
-      inline: true
+      name: `${roleEmoji(player.role)} ${cache.members.get(BigInt(player.user))
+        ?.username}`,
+      value: `${locationEmoji(player.location!)} ${player.location}`,
+      inline: true,
     });
   });
 
@@ -223,7 +137,7 @@ function reveal(ctx: Context, next: Next) {
     }
   });
 
-  fields.push({name: "visits", value: `${game?.visits}`, inline: true});
+  fields.push({ name: "visits", value: `${game?.visits}`, inline: true });
 
   if (caught) embed.description = "The boss is caught by the police\n";
   else if (game!.history.length <= 3 && game!.visits >= 4) {
@@ -239,70 +153,123 @@ function reveal(ctx: Context, next: Next) {
   }
 
   embed.fields = fields;
-  ctx.message.send({embed: embed});
+  responseEmbed(interaction, embed);
 
   return next();
 }
 
-function argLength(ctx: Context, next: Next) {
-  if (ctx.args.length >= 1) next();
-  else ctx.message.send("Invalid argument");
-}
-
-function timer(ctx: Context, next: Next) {
+/*
+function timer(interaction: Interaction, next: Next) {
   const timerCount = parseInt(ctx.args[0]);
   timerEx(timerCount, ctx.message);
   return next();
 }
+*/
 
-function history(ctx: Context, next: Next) {
-  const embed: Embed = {title: "Result", description: ""};
+function history(interaction: Interaction, next: Next) {
+  const embeds: Embed[] = [];
   if (game?.history.length) {
     let round = 1;
     game.history.forEach((players) => {
-      let result = "";
+      const embed: Embed = { title: `Round ${round}`, description: "" };
+      const fields: EmbedField[] = [];
       players.forEach((player) =>
-        result += `<@${player.user}>:\t\`${player.location}\`\n`
+        fields.push({
+          name: `${roleEmoji(player.role)} ${
+            cache.members.get(BigInt(player.user))
+          }`,
+          value: `${locationEmoji(player.location!)} ${player.location}`,
+        })
       );
-      ctx.message.send(`Round ${round}`);
-      ctx.message.send(result);
+      fields.push({ name: "visits", value: `${game?.visits}`, inline: true });
+      embed.fields = fields;
+      embeds.push(embed);
       round++;
     });
+    responseEmbeds(interaction, embeds);
     return next();
-  } else ctx.message.send("No history");
+  } else response(interaction, "No history.");
 }
 
-/*
-function checkRole(ctx: Context, next: Next) {
-  if (game?.players.get(ctx.message.author.id)?.role === Role.Police) {
-    cache.members.forEach((member) => {
-      if (member.username === ctx.args[0]) {
-        ctx.message.send(Role[game!.players.get(member.id)!.role]);
-      }
+function barrier(interaction: Interaction, next: Next) {
+  const arg = interaction.data?.options![0];
+  if (!game?.hasSetBarrier) {
+    game!.barrier = <Location> (arg?.value as string);
+    response(interaction, `You've set a barrier in ${arg?.value}`, true);
+    return next();
+  } else response(interaction, "You've already used the barrier.");
+}
+
+export async function registerCommands(guildID: bigint) {
+  const options = [];
+  for (let i = 0; i != roles.length; i++) {
+    options.push({
+      type: DiscordApplicationCommandOptionTypes.User,
+      name: `player${i + 1}`,
+      description: `player${i + 1}`,
+      required: true,
     });
-    return next();
-  } else ctx.message.send("You are not the police");
-}
-*/
-
-function barrier(ctx: Context, next: Next) {
-  if (game?.players.get(ctx.message.author.id)?.role === Role.Police) {
-    if (!game?.hasSetBarrier) {
-      if (Object.values(Location).some((loc: string) => loc === ctx.args[0])) {
-        game.barrier = <Location> ctx.args[0];
-        ctx.message.send(`You've set a barrier in ${ctx.args[0]}`);
-        return next();
-      } else ctx.message.send("Invalid place");
-    } else ctx.message.send("You've already set a barrier.");
-  } else ctx.message.send("You are not the police");
-}
-
-function help(ctx: Context, next: Next) {
-  let result = "```";
-  commands.forEach((command) => result += command.description + "\n");
-  result += "```";
-  ctx.message.send(result);
-  return next();
+  }
+  await createSlashCommand({
+    name: "assign",
+    description: "assign roles to players",
+    options: options,
+  }, guildID);
+  await createSlashCommand({
+    name: "start",
+    description: "start the game",
+  }, guildID);
+  await createSlashCommand({
+    name: "stop",
+    description: "stop the game",
+  }, guildID);
+  await createSlashCommand({
+    name: "restart",
+    description: "restart the game",
+  }, guildID);
+  await createSlashCommand({
+    name: "reveal",
+    description: "reveal everyone's location",
+  }, guildID);
+  await createSlashCommand({
+    name: "history",
+    description: "show locations & scores of the game",
+  }, guildID);
+  await createSlashCommand({
+    name: "goto",
+    description: "set location",
+    options: [{
+      type: DiscordApplicationCommandOptionTypes.String,
+      name: "location",
+      description: "a location you would like to go",
+      required: true,
+      choices: [
+        { name: "airport", value: "airport" },
+        { name: "bar", value: "bar" },
+        { name: "casino", value: "casino" },
+        { name: "hotel", value: "hotel" },
+        { name: "villa", value: "villa" },
+      ],
+    }],
+  }, guildID);
+  await createSlashCommand({
+    name: "barrier",
+    description: "set barrier",
+    options: [{
+      type: DiscordApplicationCommandOptionTypes.String,
+      name: "location",
+      description: "a location you would like set the barrier",
+      required: true,
+      choices: [
+        { name: "airport", value: "airport" },
+        { name: "bar", value: "bar" },
+        { name: "casino", value: "casino" },
+        { name: "hotel", value: "hotel" },
+        { name: "villa", value: "villa" },
+      ],
+    }],
+  }, guildID);
+  console.log(await getSlashCommands(guildID));
 }
 
 // helper functions
@@ -318,6 +285,69 @@ function shuffle(array: Array<Role>) {
   return array;
 }
 
+function response(interaction: Interaction, message: string, priv = false) {
+  sendInteractionResponse(
+    BigInt(interaction.id),
+    interaction.token,
+    {
+      type: DiscordInteractionResponseTypes.ChannelMessageWithSource,
+      data: { content: message },
+      private: priv,
+    },
+  );
+}
+
+function responseEmbed(interaction: Interaction, embed: Embed) {
+  sendInteractionResponse(
+    BigInt(interaction.id),
+    interaction.token,
+    {
+      type: DiscordInteractionResponseTypes.ChannelMessageWithSource,
+      data: { embeds: [embed] },
+    },
+  );
+}
+
+function responseEmbeds(interaction: Interaction, embeds: Embed[]) {
+  sendInteractionResponse(
+    BigInt(interaction.id),
+    interaction.token,
+    {
+      type: DiscordInteractionResponseTypes.ChannelMessageWithSource,
+      data: { embeds: embeds },
+    },
+  );
+}
+
+function roleEmoji(role: Role): string {
+  switch (role) {
+    case Role.Boss:
+      return ":eye:";
+    case Role.Police:
+      return ":cowboy:";
+    case Role.Member:
+      return ":spy:";
+    case Role.Traitor:
+      return ":spy:";
+  }
+}
+
+function locationEmoji(location: Location): string {
+  switch (location) {
+    case Location.Airport:
+      return ":airplane_departure:";
+    case Location.Bar:
+      return ":beers:";
+    case Location.Casino:
+      return ":slot_machine:";
+    case Location.Hotel:
+      return ":hotel:";
+    case Location.Villa:
+      return ":house:";
+  }
+}
+
+/*
 function timerEx(timerCount: number, message: Message) {
   message.send(`${timerCount} seconds remain.`);
   if (timerCount > 30) {
@@ -330,3 +360,4 @@ function timerEx(timerCount: number, message: Message) {
     // reveal
   }
 }
+*/
