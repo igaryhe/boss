@@ -1,3 +1,4 @@
 import { Role } from './game.ts';
 
-export const roles = [Role.Boss, Role.Police, Role.Traitor];
+export const roles = [Role.Boss, Role.Police, Role.Traitor, Role.Member, Role.Member];
+// export const roles = [Role.Boss];

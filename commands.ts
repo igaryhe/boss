@@ -1,15 +1,15 @@
 import {
-  ApplicationCommandInteractionDataOptionUser,
-  cache,
-  createSlashCommand,
-  DiscordApplicationCommandOptionTypes,
   Embed,
   EmbedField,
   Interaction,
-  sendDirectMessage,
+  ApplicationCommandInteractionDataOptionUser,
+  DiscordApplicationCommandOptionTypes,
+  DiscordInteractionResponseTypes,
+  cache,
   getSlashCommands,
+  createSlashCommand,
+  sendDirectMessage,
   sendInteractionResponse,
-  DiscordInteractionResponseTypes
 } from "./deps.ts";
 import { Game, Location, Role } from "./game.ts";
 import { roles } from "./config.ts";
@@ -23,10 +23,7 @@ commands.set("start", new Dispatcher<Interaction>(checkTextChannel, start));
 commands.set("stop", new Dispatcher<Interaction>(checkGame, stop));
 commands.set("restart", new Dispatcher<Interaction>(checkGame, restart));
 commands.set("assign", new Dispatcher<Interaction>(checkGame, assign));
-commands.set(
-  "reveal",
-  new Dispatcher<Interaction>(checkGame, checkPlayer, reveal),
-);
+commands.set("reveal", new Dispatcher<Interaction>(checkGame, checkPlayer, reveal));
 // commands.set("timer", new Dispatcher<Interaction>(argLength, timer));
 commands.set("history", new Dispatcher<Interaction>(checkGame, history));
 commands.set("goto", new Dispatcher<Interaction>(checkGame, checkPlayer, goto));
@@ -89,13 +86,14 @@ function assign(interaction: Interaction, next: Next) {
   let result = "";
   interaction.data?.options?.forEach((option) => {
     const user = option as ApplicationCommandInteractionDataOptionUser;
-    sendDirectMessage(user.value, `You are the ${Role[assigns[i]]}`);
     game?.addPlayer(user.value.toString(), assigns[i]);
     if (assigns[i] == Role.Boss) {
       result += `<@${user.value}> is the Boss.\n`;
     }
-    if (assigns[i] == Role.Police) {
+    else if (assigns[i] == Role.Police) {
       result += `<@${user.value}> is the Police.\n`;
+    } else {
+      sendDirectMessage(user.value, `You are the ${Role[assigns[i]]}`);
     }
     i++;
   });
@@ -137,7 +135,7 @@ function reveal(interaction: Interaction, next: Next) {
     }
   });
 
-  fields.push({ name: "visits", value: `${game?.visits}`, inline: true });
+  fields.push({ name: "visits", value: `${game?.visits}` });
 
   if (caught) embed.description = "The boss is caught by the police\n";
   else if (game!.history.length <= 3 && game!.visits >= 4) {
@@ -175,9 +173,9 @@ function history(interaction: Interaction, next: Next) {
       const fields: EmbedField[] = [];
       players.forEach((player) =>
         fields.push({
-          name: `${roleEmoji(player.role)} ${
-            cache.members.get(BigInt(player.user))
-          }`,
+          name: `${roleEmoji(player.role)} ${cache.members.get(
+            BigInt(player.user),
+          )?.username}`,
           value: `${locationEmoji(player.location!)} ${player.location}`,
         })
       );
