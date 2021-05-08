@@ -1,5 +1,5 @@
 import { Application, decodeString, sign_detached_verify, Interaction } from "./deps.ts";
-import { commands, registerCommands } from "./commands.ts";
+import { commands, registerCommands, res, resetResponse } from "./commands_test.ts";
 
 const app = new Application();
 const pubkey = Deno.env.get("PUBLIC_KEY")!;
@@ -32,7 +32,11 @@ app.use(async (ctx) => {
       const command = interaction.data?.name;
       const pair = commands.get(command!);
       if (pair !== undefined) {
-        commands.get(command!)?.dispatch(interaction);
+        pair.dispatch(interaction);
+        if (res !== undefined) {
+          ctx.response.body = res;
+          resetResponse();
+        }
       }
     }
   }
