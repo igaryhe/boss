@@ -15,6 +15,7 @@ export enum Role {
 
 class Player {
   user: string;
+  name?: string;
   role: Role;
   location?: Location;
   constructor(user: string, role: Role) {

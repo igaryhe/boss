@@ -1,6 +1,5 @@
 import {
   ApplicationCommandInteractionDataOptionUser,
-  cache,
   createSlashCommand,
   DiscordApplicationCommandOptionTypes,
   DiscordenoInteractionResponse,
@@ -102,6 +101,7 @@ function assign(interaction: Interaction, next: Next) {
 function goto(interaction: Interaction, next: Next) {
   const player = game?.players.get(interaction.member!.user.id);
   const arg = interaction.data?.options![0].value as string;
+  if (player?.name === undefined) player!.name = interaction.member?.user.username;
   player?.goto(<Location> arg);
   res = response(`You are in ${arg} right now`, true);
   return next();
@@ -118,8 +118,7 @@ function reveal(_interaction: Interaction, next: Next) {
   game?.players.forEach((player) => {
     if (player.role === Role.Boss) bossLoc = player.location;
     fields.push({
-      name: `${roleEmoji(player.role)} ${cache.members.get(BigInt(player.user))
-        ?.username}`,
+      name: `${roleEmoji(player.role)} ${player.name}`,
       value: `${locationEmoji(player.location!)} ${player.location}`,
       inline: true,
     });
@@ -171,9 +170,7 @@ function history(_interaction: Interaction, next: Next) {
       const fields: EmbedField[] = [];
       players.forEach((player) =>
         fields.push({
-          name: `${roleEmoji(player.role)} ${cache.members.get(
-            BigInt(player.user),
-          )?.username}`,
+          name: `${roleEmoji(player.role)} ${player.name}`,
           value: `${locationEmoji(player.location!)} ${player.location}`,
         })
       );
