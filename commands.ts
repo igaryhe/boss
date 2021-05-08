@@ -27,10 +27,7 @@ commands.set("reveal", new Dispatcher<Interaction>(checkGame, checkPlayer, revea
 // commands.set("timer", new Dispatcher<Interaction>(argLength, timer));
 commands.set("history", new Dispatcher<Interaction>(checkGame, history));
 commands.set("goto", new Dispatcher<Interaction>(checkGame, checkPlayer, goto));
-commands.set(
-  "barrier",
-  new Dispatcher<Interaction>(checkGame, checkPlayer, checkPolice, barrier),
-);
+commands.set("barrier", new Dispatcher<Interaction>(checkGame, checkPlayer, checkPolice, barrier));
 
 function checkGame(interaction: Interaction, next: Next) {
   if (game == undefined) {
