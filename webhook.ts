@@ -1,11 +1,11 @@
-import { Application, decodeString, sign_detached_verify, Interaction } from "./deps.ts";
+import { Application, decodeString, sign_detached_verify, Interaction, camelize } from "./deps.ts";
 import { commands, registerCommands, res, resetResponse } from "./commands_test.ts";
 
 const app = new Application();
 const pubkey = Deno.env.get("PUBLIC_KEY")!;
 const encoder = new TextEncoder();
 
-await registerCommands(811924657426399253n);
+// await registerCommands(811924657426399253n);
 
 app.use(async (ctx, next) => {
   const signature = ctx.request.headers.get("X-Signature-Ed25519");
@@ -28,7 +28,7 @@ app.use(async (ctx) => {
     if (result.type === 1) {
       ctx.response.body = result;
     } else if (result.type === 2) {
-      const interaction = result as Interaction;
+      const interaction = camelize<Interaction>(result);
       const command = interaction.data?.name;
       const pair = commands.get(command!);
       if (pair !== undefined) {

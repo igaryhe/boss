@@ -9,6 +9,7 @@ export {
   DiscordInteractionResponseTypes,
   sendInteractionResponse,
   deleteSlashCommand,
+  camelize,
 } from "https://raw.githubusercontent.com/discordeno/discordeno/main/mod.ts";
 export type {
   Channel,
