@@ -1,13 +1,13 @@
 import {
+  ApplicationCommandInteractionDataOptionUser,
+  createSlashCommand,
+  DiscordApplicationCommandOptionTypes,
+  DiscordenoInteractionResponse,
+  DiscordInteractionResponseTypes,
   Embed,
   EmbedField,
-  Interaction,
-  ApplicationCommandInteractionDataOptionUser,
-  DiscordApplicationCommandOptionTypes,
-  DiscordInteractionResponseTypes,
-  cache,
   getSlashCommands,
-  createSlashCommand,
+  Interaction,
   sendDirectMessage,
   sendInteractionResponse,
 } from "./deps.ts";
@@ -16,6 +16,7 @@ import { roles } from "./config.ts";
 import { Dispatcher, Next } from "./middleware.ts";
 
 let game: Game | undefined = undefined;
+export let res: DiscordenoInteractionResponse | undefined = undefined;
 
 export const commands: Map<string, Dispatcher<Interaction>> = new Map();
 
@@ -23,30 +24,42 @@ commands.set("start", new Dispatcher<Interaction>(checkTextChannel, start));
 commands.set("stop", new Dispatcher<Interaction>(checkGame, stop));
 commands.set("restart", new Dispatcher<Interaction>(checkGame, restart));
 commands.set("assign", new Dispatcher<Interaction>(checkGame, assign));
+commands.set("join", new Dispatcher<Interaction>(checkGame, checkPlayerCount, checkPlayerJoined, join));
 commands.set("reveal", new Dispatcher<Interaction>(checkGame, checkPlayer, reveal));
-// commands.set("timer", new Dispatcher<Interaction>(argLength, timer));
 commands.set("history", new Dispatcher<Interaction>(checkGame, history));
 commands.set("goto", new Dispatcher<Interaction>(checkGame, checkPlayer, goto));
 commands.set("barrier", new Dispatcher<Interaction>(checkGame, checkPlayer, checkPolice, barrier));
 
 function checkGame(interaction: Interaction, next: Next) {
   if (game == undefined) {
-    response(interaction, "You need to start the game first.");
+    res = response("You need to start the game first.");
   } else if (interaction.channelId != game?.channel.toString()) {
-    response(interaction, "You are in the wrong channel.");
+    res = response("You are in the wrong channel.");
   } else return next();
 }
 
 function checkTextChannel(interaction: Interaction, next: Next) {
   if (interaction.user !== undefined) {
-    response(interaction, "You are not in a guild channel.");
+    res = response("You are not in a guild channel.");
   } else return next();
 }
 
 function checkPlayer(interaction: Interaction, next: Next) {
   const player = game?.players.get(interaction.member!.user.id);
   if (player == undefined) {
-    response(interaction, "You are not in the game right now");
+    res = response("You are not in the game right now");
+  } else return next();
+}
+
+function checkPlayerCount(_interaction: Interaction, next: Next) {
+  if (game?.players.size === 5) {
+    res = response("5 players have joined the game.");
+  } else return next();
+}
+
+function checkPlayerJoined(interaction: Interaction, next: Next) {
+  if (game?.players.get(interaction.member?.user.id!) !== undefined) {
+    res = response("You've already joined the game.", true);
   } else return next();
 }
 
@@ -56,24 +69,24 @@ function checkPolice(interaction: Interaction, next: Next) {
       Role.Police
   ) {
     return next();
-  } else response(interaction, "You are not the police.", true);
+  } else res = response("You are not the police.", true);
 }
 
 function start(interaction: Interaction, next: Next) {
   game = new Game(BigInt(interaction.channelId));
-  response(interaction, "Please assign roles to players");
+  res = response("Please assign roles to players");
   return next();
 }
 
-function stop(interaction: Interaction, next: Next) {
+function stop(_interaction: Interaction, next: Next) {
   game = undefined;
-  response(interaction, "The game is stopped.");
+  res = response("The game is stopped.");
   return next();
 }
 
 function restart(interaction: Interaction, next: Next) {
   game = new Game(BigInt(interaction.channelId));
-  response(interaction, "Please assign roles to players");
+  res = response("Please assign roles to players");
   return next();
 }
 
@@ -86,27 +99,46 @@ function assign(interaction: Interaction, next: Next) {
     game?.addPlayer(user.value.toString(), assigns[i]);
     if (assigns[i] == Role.Boss) {
       result += `<@${user.value}> is the Boss.\n`;
-    }
-    else if (assigns[i] == Role.Police) {
+    } else if (assigns[i] == Role.Police) {
       result += `<@${user.value}> is the Police.\n`;
     } else {
       sendDirectMessage(user.value, `You are the ${Role[assigns[i]]}`);
     }
     i++;
   });
-  response(interaction, result);
+  res = response(result);
+  return next();
+}
+
+async function join(interaction: Interaction, next: Next) {
+  const shuffled = shuffle(roles);
+  const user = interaction.member?.user;
+  game?.addPlayer(user?.id!, shuffled[0]);
+  let result = "";
+  let priv = false;
+  if (shuffled[0] == Role.Boss) {
+    result += `<@${user?.id}> is the Boss.\n`;
+  } else if (shuffled[0] == Role.Police) {
+    result += `<@${user?.id}> is the Police.\n`;
+  } else {
+    result = `You are the ${Role[shuffled[0]]}`;
+    priv = true;
+    await sendInteractionResponse(BigInt(interaction.id), interaction.token, response(`<@${user?.id} joined the game>`));
+  }
+  res = response(result, priv);
   return next();
 }
 
 function goto(interaction: Interaction, next: Next) {
   const player = game?.players.get(interaction.member!.user.id);
   const arg = interaction.data?.options![0].value as string;
+  if (player?.name === undefined) player!.name = interaction.member?.user.username;
   player?.goto(<Location> arg);
-  response(interaction, `You are in ${arg} right now`, true);
+  res = response(`You are in ${arg} right now`, true);
   return next();
 }
 
-function reveal(interaction: Interaction, next: Next) {
+function reveal(_interaction: Interaction, next: Next) {
   const embed: Embed = { title: "Result", description: "" };
   const fields: EmbedField[] = [];
   let caught = false;
@@ -117,8 +149,7 @@ function reveal(interaction: Interaction, next: Next) {
   game?.players.forEach((player) => {
     if (player.role === Role.Boss) bossLoc = player.location;
     fields.push({
-      name: `${roleEmoji(player.role)} ${cache.members.get(BigInt(player.user))
-        ?.username}`,
+      name: `${roleEmoji(player.role)} ${player.name}`,
       value: `${locationEmoji(player.location!)} ${player.location}`,
       inline: true,
     });
@@ -148,7 +179,7 @@ function reveal(interaction: Interaction, next: Next) {
   }
 
   embed.fields = fields;
-  responseEmbed(interaction, embed);
+  res = responseEmbed(embed);
 
   return next();
 }
@@ -161,7 +192,7 @@ function timer(interaction: Interaction, next: Next) {
 }
 */
 
-function history(interaction: Interaction, next: Next) {
+function history(_interaction: Interaction, next: Next) {
   const embeds: Embed[] = [];
   if (game?.history.length) {
     let round = 1;
@@ -170,9 +201,7 @@ function history(interaction: Interaction, next: Next) {
       const fields: EmbedField[] = [];
       players.forEach((player) =>
         fields.push({
-          name: `${roleEmoji(player.role)} ${cache.members.get(
-            BigInt(player.user),
-          )?.username}`,
+          name: `${roleEmoji(player.role)} ${player.name}`,
           value: `${locationEmoji(player.location!)} ${player.location}`,
         })
       );
@@ -181,18 +210,18 @@ function history(interaction: Interaction, next: Next) {
       embeds.push(embed);
       round++;
     });
-    responseEmbeds(interaction, embeds);
+    res = responseEmbeds(embeds);
     return next();
-  } else response(interaction, "No history.");
+  } else res = response("No history.");
 }
 
 function barrier(interaction: Interaction, next: Next) {
   const arg = interaction.data?.options![0];
   if (!game?.hasSetBarrier) {
     game!.barrier = <Location> (arg?.value as string);
-    response(interaction, `You've set a barrier in ${arg?.value}`, true);
+    res = response(`You've set a barrier in ${arg?.value}`, true);
     return next();
-  } else response(interaction, "You've already used the barrier.");
+  } else res = response("You've already used the barrier.");
 }
 
 export async function registerCommands(guildID: bigint) {
@@ -280,38 +309,33 @@ function shuffle(array: Array<Role>) {
   return array;
 }
 
-function response(interaction: Interaction, message: string, priv = false) {
-  sendInteractionResponse(
-    BigInt(interaction.id),
-    interaction.token,
-    {
-      type: DiscordInteractionResponseTypes.ChannelMessageWithSource,
-      data: { content: message },
-      private: priv,
-    },
-  );
+function response(
+  message: string,
+  priv = false,
+): DiscordenoInteractionResponse {
+  return {
+    type: DiscordInteractionResponseTypes.ChannelMessageWithSource,
+    data: { content: message },
+    private: priv,
+  };
 }
 
-function responseEmbed(interaction: Interaction, embed: Embed) {
-  sendInteractionResponse(
-    BigInt(interaction.id),
-    interaction.token,
-    {
-      type: DiscordInteractionResponseTypes.ChannelMessageWithSource,
-      data: { embeds: [embed] },
-    },
-  );
+function responseEmbed(embed: Embed) {
+  return {
+    type: DiscordInteractionResponseTypes.ChannelMessageWithSource,
+    data: { embeds: [embed] },
+  };
 }
 
-function responseEmbeds(interaction: Interaction, embeds: Embed[]) {
-  sendInteractionResponse(
-    BigInt(interaction.id),
-    interaction.token,
-    {
-      type: DiscordInteractionResponseTypes.ChannelMessageWithSource,
-      data: { embeds: embeds },
-    },
-  );
+function responseEmbeds(embeds: Embed[]) {
+  return {
+    type: DiscordInteractionResponseTypes.ChannelMessageWithSource,
+    data: { embeds: embeds },
+  };
+}
+
+export function resetResponse() {
+  res = undefined;
 }
 
 function roleEmoji(role: Role): string {

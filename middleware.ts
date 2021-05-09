@@ -1,9 +1,9 @@
 export interface Next {
-  (): void;
+  (): void | Promise<void>;
 }
 
 interface Middleware<T> {
-  (context: T, next: Next): void;
+  (context: T, next: Next): void | Promise<void>;
 }
 
 export class Dispatcher<T> {
@@ -16,12 +16,13 @@ export class Dispatcher<T> {
   use(...mw: Middleware<T>[]) {
     this.middlewares.push(...mw);
   }
-  dispatch(context: T) {
+  dispatch(context: T): void | Promise<void> {
     return invokeMiddlewares(context, this.middlewares);
   }
 }
-function invokeMiddlewares<T>(context: T, middlewares: Middleware<T>[]): void {
-  if (!middlewares.length) return;
+
+function invokeMiddlewares<T>(context: T, middlewares: Middleware<T>[]): void | Promise<void> {
+  if (!middlewares.length) return;  
   const mw = middlewares[0];
-  return mw(context, () => invokeMiddlewares(context, middlewares.slice(1)));
+  return mw(context, async () => await invokeMiddlewares(context, middlewares.slice(1)));
 }
