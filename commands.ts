@@ -9,20 +9,17 @@ import {
 import { Game, Location, Role } from "./game.ts";
 import { roles } from "./config.ts";
 import { Dispatcher, Next } from "./middleware.ts";
-import { updateCommands, sendFollowup } from "./rest.ts";
+import { sendFollowup, updateCommands } from "./rest.ts";
 
 let game: Game | undefined = undefined;
-
 let gameRoles: Role[] = [];
 
 export let res: DiscordenoInteractionResponse | undefined = undefined;
 
 export const commands: Map<string, Dispatcher<Interaction>> = new Map();
-
 commands.set("start", new Dispatcher<Interaction>(checkTextChannel, start));
 commands.set("stop", new Dispatcher<Interaction>(checkGame, stop));
-commands.set("restart", new Dispatcher<Interaction>(checkGame, restart));
-// commands.set("assign", new Dispatcher<Interaction>(checkGame, assign));
+commands.set("restart", new Dispatcher<Interaction>(checkGame, start));
 commands.set(
   "join",
   new Dispatcher<Interaction>(
@@ -34,7 +31,12 @@ commands.set(
 );
 commands.set(
   "reveal",
-  new Dispatcher<Interaction>(checkGame, checkPlayer, reveal),
+  new Dispatcher<Interaction>(
+    checkGame,
+    checkPlayer,
+    checkEnoughPlayer,
+    reveal,
+  ),
 );
 commands.set("history", new Dispatcher<Interaction>(checkGame, history));
 commands.set("goto", new Dispatcher<Interaction>(checkGame, checkPlayer, goto));
@@ -45,97 +47,71 @@ commands.set(
 
 function checkGame(interaction: Interaction, next: Next) {
   if (game == undefined) {
-    res = response("You need to start the game first.");
+    res = response("You need to start the game first.", true);
   } else if (interaction.channelId != game?.channel.toString()) {
-    res = response("You are in the wrong channel.");
+    res = response("You are in the wrong channel.", true);
   } else return next();
 }
 
 function checkTextChannel(interaction: Interaction, next: Next) {
-  if (interaction.user !== undefined) {
-    res = response("You are not in a guild channel.");
-  } else return next();
+  if (interaction.user === undefined) return next();
+  res = response("You are not in a guild channel");
 }
 
 function checkPlayer(interaction: Interaction, next: Next) {
   const player = game?.players.get(interaction.member!.user.id);
-  if (player == undefined) {
-    res = response("You are not in the game right now");
-  } else return next();
+  if (player !== undefined) return next();
+  res = response("You are not in the game right now", true);
 }
 
 function checkPlayerCount(_interaction: Interaction, next: Next) {
-  if (game?.players.size === 5) {
-    res = response("5 players have joined the game.");
-  } else return next();
+  if (game?.players.size! < roles.length) return next();
+  res = response("5 players have joined the game", true);
+}
+
+function checkEnoughPlayer(_: Interaction, next: Next) {
+  if (game?.players.size === roles.length) return next();
+  res = response("Not enough players");
 }
 
 function checkPlayerJoined(interaction: Interaction, next: Next) {
-  if (game?.players.get(interaction.member?.user.id!) !== undefined) {
-    res = response("You've already joined the game.", true);
-  } else return next();
+  const player = game?.players.get(interaction.member?.user.id!);
+  if (player === undefined) return next();
+  res = response("You've already joined the game", true);
 }
 
 function checkPolice(interaction: Interaction, next: Next) {
-  if (
-    game?.players.get(interaction.member!.user.id)?.role ===
-      Role.Police
-  ) {
-    return next();
-  } else res = response("You are not the police.", true);
+  const player = game?.players.get(interaction.member!.user.id);
+  if (player?.role !== Role.Police) return next();
+  res = response("You are not the Police", true);
 }
 
 function start(interaction: Interaction, _next: Next) {
   game = new Game(BigInt(interaction.channelId));
   gameRoles = shuffle(roles);
-  res = response("Please assign roles to players");
+  res = response("Players could join the game now");
 }
 
 function stop(_interaction: Interaction, _next: Next) {
   game = undefined;
   gameRoles = [];
-  res = response("The game is stopped.");
+  res = response("The game is stopped");
 }
-
-function restart(interaction: Interaction, _next: Next) {
-  game = new Game(BigInt(interaction.channelId));
-  gameRoles = shuffle(roles);
-  res = response("Please assign roles to players");
-}
-
-/*
-function assign(interaction: Interaction, next: Next) {
-  const assigns = shuffle(roles);
-  let i = 0;
-  let result = "";
-  interaction.data?.options?.forEach((option) => {
-    const user = option as ApplicationCommandInteractionDataOptionUser;
-    game?.addPlayer(user.value.toString(), assigns[i]);
-    if (assigns[i] == Role.Boss) {
-      result += `<@${user.value}> is the Boss.\n`;
-    } else if (assigns[i] == Role.Police) {
-      result += `<@${user.value}> is the Police.\n`;
-    } else {
-      sendDirectMessage(user.value, `You are the ${Role[assigns[i]]}`);
-    }
-    i++;
-  });
-  res = response(result);
-  return next();
-}
-*/
 
 function join(interaction: Interaction, _next: Next) {
   const user = interaction.member?.user;
   const role = gameRoles.shift()!;
   game?.addPlayer(user?.id!, role);
   if (role == Role.Boss) {
-    res = response(`<@${user?.id}> is the Boss.`);
+    res = response(`<@${user?.id}> is the Boss ${roleEmoji(role)}`);
   } else if (role == Role.Police) {
-    res = response(`<@${user?.id}> is the Police.`);
+    res = response(`<@${user?.id}> is the Police ${roleEmoji(role)}`);
   } else {
-    res = response(`<@${user?.id}> joined the game.`);
-    sendFollowup(interaction.token, `You are the ${Role[role]}`);
+    res = response(`<@${user?.id}> joined the game`);
+    sendFollowup(
+      interaction.token,
+      `You are the ${Role[role]} ${roleEmoji(role)}`,
+    );
   }
 }
 
@@ -193,14 +169,6 @@ function reveal(_interaction: Interaction, _next: Next) {
   res = responseEmbed(embed);
 }
 
-/*
-function timer(interaction: Interaction, next: Next) {
-  const timerCount = parseInt(ctx.args[0]);
-  timerEx(timerCount, ctx.message);
-  return next();
-}
-*/
-
 function history(_interaction: Interaction, _next: Next) {
   const embeds: Embed[] = [];
   if (game?.history.length) {
@@ -228,112 +196,25 @@ function barrier(interaction: Interaction, _next: Next) {
   if (!game?.hasSetBarrier) {
     game!.barrier = <Location> (arg?.value as string);
     res = response(`You've set a barrier in ${arg?.value}`, true);
-  } else res = response("You've already used the barrier.");
+  } else res = response("You've already used the barrier", true);
 }
 
+const choices = [
+  { name: "airport", value: "airport" },
+  { name: "bar", value: "bar" },
+  { name: "casino", value: "casino" },
+  { name: "hotel", value: "hotel" },
+  { name: "villa", value: "villa" },
+];
+
 export async function registerCommands(guildID: bigint) {
-  /*
-  const options = [];
-  for (let i = 0; i != roles.length; i++) {
-    options.push({
-      type: DiscordApplicationCommandOptionTypes.User,
-      name: `player${i + 1}`,
-      description: `player${i + 1}`,
-      required: true,
-    });
-  }
-  await registerCommand(appId, token, {
-    name: "assign",
-    description: "assign roles to players",
-    options: options,
-  }, guildID);
-  */
-  /*
-  console.log("registering");
-  await registerCommand(appId, token, {
-    name: "join",
-    description: "Join the game",
-  }, guildID);
-  await registerCommand(appId, token, {
-    name: "start",
-    description: "start the game",
-  }, guildID);
-  await registerCommand(appId, token, {
-    name: "stop",
-    description: "stop the game",
-  }, guildID);
-  await registerCommand(appId, token, {
-    name: "restart",
-    description: "restart the game",
-  }, guildID);
-  await registerCommand(appId, token, {
-    name: "reveal",
-    description: "reveal everyone's location",
-  }, guildID);
-  await registerCommand(appId, token, {
-    name: "history",
-    description: "show locations & scores of the game",
-  }, guildID);
-  await registerCommand(appId, token, {
-    name: "goto",
-    description: "set location",
-    options: [{
-      type: DiscordApplicationCommandOptionTypes.String,
-      name: "location",
-      description: "a location you would like to go",
-      required: true,
-      choices: [
-        { name: "airport", value: "airport" },
-        { name: "bar", value: "bar" },
-        { name: "casino", value: "casino" },
-        { name: "hotel", value: "hotel" },
-        { name: "villa", value: "villa" },
-      ],
-    }],
-  }, guildID);
-  await registerCommand(appId, token, {
-    name: "barrier",
-    description: "set barrier",
-    options: [{
-      type: DiscordApplicationCommandOptionTypes.String,
-      name: "location",
-      description: "a location you would like set the barrier",
-      required: true,
-      choices: [
-        { name: "airport", value: "airport" },
-        { name: "bar", value: "bar" },
-        { name: "casino", value: "casino" },
-        { name: "hotel", value: "hotel" },
-        { name: "villa", value: "villa" },
-      ],
-    }],
-  }, guildID);
-  */
   await updateCommands([
-    {
-      name: "join",
-      description: "Join the game",
-    },
-    {
-      name: "start",
-      description: "start the game",
-    },
-    {
-      name: "stop",
-      description: "stop the game",
-    },
-    {
-      name: "restart",
-      description: "restart the game",
-    },
-    {
-      name: "reveal",
-      description: "reveal everyone's location",
-    },
-    {
-      name: "history",
-      description: "show locations & scores of the game",
-    },
+    { name: "join", description: "Join the game" },
+    { name: "start", description: "start the game" },
+    { name: "stop", description: "stop the game" },
+    { name: "restart", description: "restart the game" },
+    { name: "reveal", description: "reveal everyone's location" },
+    { name: "history", description: "show locations & scores of the game" },
     {
       name: "goto",
       description: "set location",
@@ -342,13 +223,7 @@ export async function registerCommands(guildID: bigint) {
         name: "location",
         description: "a location you would like to go",
         required: true,
-        choices: [
-          { name: "airport", value: "airport" },
-          { name: "bar", value: "bar" },
-          { name: "casino", value: "casino" },
-          { name: "hotel", value: "hotel" },
-          { name: "villa", value: "villa" },
-        ],
+        choices: choices,
       }],
     },
     {
@@ -359,13 +234,7 @@ export async function registerCommands(guildID: bigint) {
         name: "location",
         description: "a location you would like set the barrier",
         required: true,
-        choices: [
-          { name: "airport", value: "airport" },
-          { name: "bar", value: "bar" },
-          { name: "casino", value: "casino" },
-          { name: "hotel", value: "hotel" },
-          { name: "villa", value: "villa" },
-        ],
+        choices: choices,
       }],
     },
   ], guildID);
@@ -388,7 +257,7 @@ function response(
   message: string,
   priv = false,
 ): DiscordenoInteractionResponse {
-  const res: DiscordenoInteractionResponse =  {
+  const res: DiscordenoInteractionResponse = {
     type: DiscordInteractionResponseTypes.ChannelMessageWithSource,
     data: { content: message },
   };
@@ -443,6 +312,12 @@ function locationEmoji(location: Location): string {
 }
 
 /*
+function timer(interaction: Interaction, next: Next) {
+  const timerCount = parseInt(ctx.args[0]);
+  timerEx(timerCount, ctx.message);
+  return next();
+}
+
 function timerEx(timerCount: number, message: Message) {
   message.send(`${timerCount} seconds remain.`);
   if (timerCount > 30) {
