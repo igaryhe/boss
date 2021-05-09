@@ -59,7 +59,7 @@ function checkTextChannel(interaction: Interaction, next: Next) {
 }
 
 function checkPlayer(interaction: Interaction, next: Next) {
-  if (!game?.players.has(interaction.member?.user.id!)) return next();
+  if (game?.players.has(interaction.member?.user.id!)) return next();
   res = response("You are not in the game right now", true);
 }
 
@@ -74,7 +74,7 @@ function checkEnoughPlayer(_: Interaction, next: Next) {
 }
 
 function checkPlayerJoined(interaction: Interaction, next: Next) {
-  if (game?.players.has(interaction.member?.user.id!)) return next();
+  if (!game?.players.has(interaction.member?.user.id!)) return next();
   res = response("You've already joined the game", true);
 }
 
