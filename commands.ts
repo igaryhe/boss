@@ -129,15 +129,13 @@ function join(interaction: Interaction, _next: Next) {
   const user = interaction.member?.user;
   const role = gameRoles.shift()!;
   game?.addPlayer(user?.id!, role);
-  let result = "";
-  let priv = false;
   if (role == Role.Boss) {
     res = response(`<@${user?.id}> is the Boss.`);
   } else if (role == Role.Police) {
     res = response(`<@${user?.id}> is the Police.`);
   } else {
     res = response(`You are the ${Role[role]}`, true);
-    sendFollowup(interaction.id, response(`<@${user?.id}> joined the game.`));
+    sendFollowup(interaction.token, `<@${user?.id}> joined the game.`);
   }
 }
 
@@ -390,11 +388,12 @@ function response(
   message: string,
   priv = false,
 ): DiscordenoInteractionResponse {
-  return {
+  const res: DiscordenoInteractionResponse =  {
     type: DiscordInteractionResponseTypes.ChannelMessageWithSource,
     data: { content: message },
-    private: priv,
   };
+  if (priv) res.data!.flags = 64;
+  return res;
 }
 
 function responseEmbed(embed: Embed) {
