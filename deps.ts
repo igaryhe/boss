@@ -10,6 +10,7 @@ export {
   sendInteractionResponse,
   deleteSlashCommand,
   camelize,
+  snakelize,
 } from "https://raw.githubusercontent.com/discordeno/discordeno/main/mod.ts";
 export type {
   Channel,
@@ -20,6 +21,7 @@ export type {
   Interaction,
   ApplicationCommandInteractionDataOptionUser,
   CreateGlobalApplicationCommand,
+  ExecuteWebhook,
 } from "https://raw.githubusercontent.com/discordeno/discordeno/main/mod.ts";
 export { Application } from "https://deno.land/x/oak/mod.ts";
 export { sign_detached_verify } from "https://deno.land/x/tweetnacl_deno_fix/src/sign.ts";

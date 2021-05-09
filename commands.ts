@@ -132,15 +132,13 @@ function join(interaction: Interaction, _next: Next) {
   let result = "";
   let priv = false;
   if (role == Role.Boss) {
-    result += `<@${user?.id}> is the Boss.\n`;
+    res = response(`<@${user?.id}> is the Boss.`);
   } else if (role == Role.Police) {
-    result += `<@${user?.id}> is the Police.\n`;
+    res = response(`<@${user?.id}> is the Police.`);
   } else {
-    result = `You are the ${Role[role]}`;
-    priv = true;
+    res = response(`You are the ${Role[role]}`, true);
     sendFollowup(interaction.id, response(`<@${user?.id}> joined the game.`));
   }
-  res = response(result, priv);
 }
 
 function goto(interaction: Interaction, _next: Next) {
