@@ -59,9 +59,12 @@ export async function updateCommands(
 
 export async function sendFollowup(id: string, content: string) {
   const url = `https://discord.com/api/v8/webhooks/${appId}/${id}?wait=true`;
+  const headers = new Headers();
+  headers.append("Content-Type", "application/json");
   const response = await fetch(url, {
     method: "POST",
-    body: JSON.stringify({content: content}),
+    headers: headers,
+    body: JSON.stringify({content: content, flags: 64}),
   });
   response.json().then((data) => console.log(data));
 }

@@ -134,8 +134,8 @@ function join(interaction: Interaction, _next: Next) {
   } else if (role == Role.Police) {
     res = response(`<@${user?.id}> is the Police.`);
   } else {
-    res = response(`You are the ${Role[role]}`, true);
-    sendFollowup(interaction.token, `<@${user?.id}> joined the game.`);
+    res = response(`<@${user?.id}> joined the game.`);
+    sendFollowup(interaction.token, `You are the ${Role[role]}`);
   }
 }
 
