@@ -80,7 +80,7 @@ function checkPlayerJoined(interaction: Interaction, next: Next) {
 
 function checkPolice(interaction: Interaction, next: Next) {
   const player = game?.players.get(interaction.member!.user.id);
-  if (player?.role !== Role.Police) return next();
+  if (player?.role === Role.Police) return next();
   res = response("You are not the Police", true);
 }
 
