@@ -1,18 +1,15 @@
 import {
-  ApplicationCommandInteractionDataOptionUser,
   DiscordApplicationCommandOptionTypes,
   DiscordenoInteractionResponse,
   DiscordInteractionResponseTypes,
   Embed,
   EmbedField,
   Interaction,
-  sendDirectMessage,
-  sendInteractionResponse,
 } from "./deps.ts";
 import { Game, Location, Role } from "./game.ts";
 import { roles } from "./config.ts";
 import { Dispatcher, Next } from "./middleware.ts";
-import { updateCommands } from "./rest.ts";
+import { updateCommands, sendFollowup } from "./rest.ts";
 
 let game: Game | undefined = undefined;
 
@@ -128,7 +125,7 @@ function assign(interaction: Interaction, next: Next) {
 }
 */
 
-async function join(interaction: Interaction, _next: Next) {
+function join(interaction: Interaction, _next: Next) {
   const user = interaction.member?.user;
   const role = gameRoles.shift()!;
   game?.addPlayer(user?.id!, role);
@@ -141,11 +138,7 @@ async function join(interaction: Interaction, _next: Next) {
   } else {
     result = `You are the ${Role[role]}`;
     priv = true;
-    await sendInteractionResponse(
-      BigInt(interaction.id),
-      interaction.token,
-      response(`<@${user?.id} joined the game>`),
-    );
+    sendFollowup(interaction.id, response(`<@${user?.id}> joined the game.`));
   }
   res = response(result, priv);
 }
