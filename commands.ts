@@ -234,11 +234,14 @@ export async function registerCommands(guildID: bigint) {
       required: true,
     });
   }
+  /*
   await createSlashCommand({
     name: "assign",
     description: "assign roles to players",
     options: options,
   }, guildID);
+  */
+ await createSlashCommand({name: "join", description: "Join the game"}, guildID);
   await createSlashCommand({
     name: "start",
     description: "start the game",

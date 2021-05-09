@@ -5,7 +5,7 @@ const app = new Application();
 const pubkey = Deno.env.get("PUBLIC_KEY")!;
 const encoder = new TextEncoder();
 
-// await registerCommands(811924657426399253n);
+await registerCommands(811924657426399253n);
 
 app.use(async (ctx, next) => {
   const signature = ctx.request.headers.get("X-Signature-Ed25519");
