@@ -1,12 +1,10 @@
 import {
   ApplicationCommandInteractionDataOptionUser,
-  createSlashCommand,
   DiscordApplicationCommandOptionTypes,
   DiscordenoInteractionResponse,
   DiscordInteractionResponseTypes,
   Embed,
   EmbedField,
-  getSlashCommands,
   Interaction,
   sendDirectMessage,
   sendInteractionResponse,
@@ -14,8 +12,12 @@ import {
 import { Game, Location, Role } from "./game.ts";
 import { roles } from "./config.ts";
 import { Dispatcher, Next } from "./middleware.ts";
+import { updateCommands } from "./rest.ts";
 
 let game: Game | undefined = undefined;
+
+let gameRoles: Role[] = [];
+
 export let res: DiscordenoInteractionResponse | undefined = undefined;
 
 export const commands: Map<string, Dispatcher<Interaction>> = new Map();
@@ -23,12 +25,26 @@ export const commands: Map<string, Dispatcher<Interaction>> = new Map();
 commands.set("start", new Dispatcher<Interaction>(checkTextChannel, start));
 commands.set("stop", new Dispatcher<Interaction>(checkGame, stop));
 commands.set("restart", new Dispatcher<Interaction>(checkGame, restart));
-commands.set("assign", new Dispatcher<Interaction>(checkGame, assign));
-commands.set("join", new Dispatcher<Interaction>(checkGame, checkPlayerCount, checkPlayerJoined, join));
-commands.set("reveal", new Dispatcher<Interaction>(checkGame, checkPlayer, reveal));
+// commands.set("assign", new Dispatcher<Interaction>(checkGame, assign));
+commands.set(
+  "join",
+  new Dispatcher<Interaction>(
+    checkGame,
+    checkPlayerCount,
+    checkPlayerJoined,
+    join,
+  ),
+);
+commands.set(
+  "reveal",
+  new Dispatcher<Interaction>(checkGame, checkPlayer, reveal),
+);
 commands.set("history", new Dispatcher<Interaction>(checkGame, history));
 commands.set("goto", new Dispatcher<Interaction>(checkGame, checkPlayer, goto));
-commands.set("barrier", new Dispatcher<Interaction>(checkGame, checkPlayer, checkPolice, barrier));
+commands.set(
+  "barrier",
+  new Dispatcher<Interaction>(checkGame, checkPlayer, checkPolice, barrier),
+);
 
 function checkGame(interaction: Interaction, next: Next) {
   if (game == undefined) {
@@ -72,24 +88,25 @@ function checkPolice(interaction: Interaction, next: Next) {
   } else res = response("You are not the police.", true);
 }
 
-function start(interaction: Interaction, next: Next) {
+function start(interaction: Interaction, _next: Next) {
   game = new Game(BigInt(interaction.channelId));
+  gameRoles = shuffle(roles);
   res = response("Please assign roles to players");
-  return next();
 }
 
-function stop(_interaction: Interaction, next: Next) {
+function stop(_interaction: Interaction, _next: Next) {
   game = undefined;
+  gameRoles = [];
   res = response("The game is stopped.");
-  return next();
 }
 
-function restart(interaction: Interaction, next: Next) {
+function restart(interaction: Interaction, _next: Next) {
   game = new Game(BigInt(interaction.channelId));
+  gameRoles = shuffle(roles);
   res = response("Please assign roles to players");
-  return next();
 }
 
+/*
 function assign(interaction: Interaction, next: Next) {
   const assigns = shuffle(roles);
   let i = 0;
@@ -109,36 +126,41 @@ function assign(interaction: Interaction, next: Next) {
   res = response(result);
   return next();
 }
+*/
 
-async function join(interaction: Interaction, next: Next) {
-  const shuffled = shuffle(roles);
+async function join(interaction: Interaction, _next: Next) {
   const user = interaction.member?.user;
-  game?.addPlayer(user?.id!, shuffled[0]);
+  const role = gameRoles.shift()!;
+  game?.addPlayer(user?.id!, role);
   let result = "";
   let priv = false;
-  if (shuffled[0] == Role.Boss) {
+  if (role == Role.Boss) {
     result += `<@${user?.id}> is the Boss.\n`;
-  } else if (shuffled[0] == Role.Police) {
+  } else if (role == Role.Police) {
     result += `<@${user?.id}> is the Police.\n`;
   } else {
-    result = `You are the ${Role[shuffled[0]]}`;
+    result = `You are the ${Role[role]}`;
     priv = true;
-    await sendInteractionResponse(BigInt(interaction.id), interaction.token, response(`<@${user?.id} joined the game>`));
+    await sendInteractionResponse(
+      BigInt(interaction.id),
+      interaction.token,
+      response(`<@${user?.id} joined the game>`),
+    );
   }
   res = response(result, priv);
-  return next();
 }
 
-function goto(interaction: Interaction, next: Next) {
+function goto(interaction: Interaction, _next: Next) {
   const player = game?.players.get(interaction.member!.user.id);
   const arg = interaction.data?.options![0].value as string;
-  if (player?.name === undefined) player!.name = interaction.member?.user.username;
+  if (player?.name === undefined) {
+    player!.name = interaction.member?.user.username;
+  }
   player?.goto(<Location> arg);
   res = response(`You are in ${arg} right now`, true);
-  return next();
 }
 
-function reveal(_interaction: Interaction, next: Next) {
+function reveal(_interaction: Interaction, _next: Next) {
   const embed: Embed = { title: "Result", description: "" };
   const fields: EmbedField[] = [];
   let caught = false;
@@ -180,8 +202,6 @@ function reveal(_interaction: Interaction, next: Next) {
 
   embed.fields = fields;
   res = responseEmbed(embed);
-
-  return next();
 }
 
 /*
@@ -192,7 +212,7 @@ function timer(interaction: Interaction, next: Next) {
 }
 */
 
-function history(_interaction: Interaction, next: Next) {
+function history(_interaction: Interaction, _next: Next) {
   const embeds: Embed[] = [];
   if (game?.history.length) {
     let round = 1;
@@ -211,20 +231,19 @@ function history(_interaction: Interaction, next: Next) {
       round++;
     });
     res = responseEmbeds(embeds);
-    return next();
   } else res = response("No history.");
 }
 
-function barrier(interaction: Interaction, next: Next) {
+function barrier(interaction: Interaction, _next: Next) {
   const arg = interaction.data?.options![0];
   if (!game?.hasSetBarrier) {
     game!.barrier = <Location> (arg?.value as string);
     res = response(`You've set a barrier in ${arg?.value}`, true);
-    return next();
   } else res = response("You've already used the barrier.");
 }
 
 export async function registerCommands(guildID: bigint) {
+  /*
   const options = [];
   for (let i = 0; i != roles.length; i++) {
     options.push({
@@ -234,35 +253,39 @@ export async function registerCommands(guildID: bigint) {
       required: true,
     });
   }
-  /*
-  await createSlashCommand({
+  await registerCommand(appId, token, {
     name: "assign",
     description: "assign roles to players",
     options: options,
   }, guildID);
   */
- await createSlashCommand({name: "join", description: "Join the game"}, guildID);
-  await createSlashCommand({
+  /*
+  console.log("registering");
+  await registerCommand(appId, token, {
+    name: "join",
+    description: "Join the game",
+  }, guildID);
+  await registerCommand(appId, token, {
     name: "start",
     description: "start the game",
   }, guildID);
-  await createSlashCommand({
+  await registerCommand(appId, token, {
     name: "stop",
     description: "stop the game",
   }, guildID);
-  await createSlashCommand({
+  await registerCommand(appId, token, {
     name: "restart",
     description: "restart the game",
   }, guildID);
-  await createSlashCommand({
+  await registerCommand(appId, token, {
     name: "reveal",
     description: "reveal everyone's location",
   }, guildID);
-  await createSlashCommand({
+  await registerCommand(appId, token, {
     name: "history",
     description: "show locations & scores of the game",
   }, guildID);
-  await createSlashCommand({
+  await registerCommand(appId, token, {
     name: "goto",
     description: "set location",
     options: [{
@@ -279,7 +302,7 @@ export async function registerCommands(guildID: bigint) {
       ],
     }],
   }, guildID);
-  await createSlashCommand({
+  await registerCommand(appId, token, {
     name: "barrier",
     description: "set barrier",
     options: [{
@@ -296,7 +319,67 @@ export async function registerCommands(guildID: bigint) {
       ],
     }],
   }, guildID);
-  console.log(await getSlashCommands(guildID));
+  */
+  await updateCommands([
+    {
+      name: "join",
+      description: "Join the game",
+    },
+    {
+      name: "start",
+      description: "start the game",
+    },
+    {
+      name: "stop",
+      description: "stop the game",
+    },
+    {
+      name: "restart",
+      description: "restart the game",
+    },
+    {
+      name: "reveal",
+      description: "reveal everyone's location",
+    },
+    {
+      name: "history",
+      description: "show locations & scores of the game",
+    },
+    {
+      name: "goto",
+      description: "set location",
+      options: [{
+        type: DiscordApplicationCommandOptionTypes.String,
+        name: "location",
+        description: "a location you would like to go",
+        required: true,
+        choices: [
+          { name: "airport", value: "airport" },
+          { name: "bar", value: "bar" },
+          { name: "casino", value: "casino" },
+          { name: "hotel", value: "hotel" },
+          { name: "villa", value: "villa" },
+        ],
+      }],
+    },
+    {
+      name: "barrier",
+      description: "set barrier",
+      options: [{
+        type: DiscordApplicationCommandOptionTypes.String,
+        name: "location",
+        description: "a location you would like set the barrier",
+        required: true,
+        choices: [
+          { name: "airport", value: "airport" },
+          { name: "bar", value: "bar" },
+          { name: "casino", value: "casino" },
+          { name: "hotel", value: "hotel" },
+          { name: "villa", value: "villa" },
+        ],
+      }],
+    },
+  ], guildID);
 }
 
 // helper functions
