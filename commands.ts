@@ -11,6 +11,8 @@ import { roles } from "./config.ts";
 import { Dispatcher, Next } from "./middleware.ts";
 import { sendFollowup, updateCommands } from "./rest.ts";
 
+const template = "https://docs.google.com/spreadsheets/d/1uP0bUvNAvjLvQM27nYS7YXQpMNkBmeqvr8ts1WXePvg";
+
 let game: Game | undefined = undefined;
 let gameRoles: Role[] = [];
 
@@ -103,6 +105,7 @@ function join(interaction: Interaction, _next: Next) {
   game?.addPlayer(user?.id!, role);
   if (role == Role.Boss) {
     res = response(`<@${user?.id}> is the Boss ${roleEmoji(role)}`);
+    sendFollowup(interaction.token, template);
   } else if (role == Role.Police) {
     res = response(`<@${user?.id}> is the Police ${roleEmoji(role)}`);
   } else {
@@ -151,11 +154,15 @@ function reveal(_interaction: Interaction, _next: Next) {
 
   fields.push({ name: "visits", value: `${game?.visits}` });
 
-  if (caught) embed.description = "The boss is caught by the police\n";
-  else if (game!.history.length <= 3 && game!.visits >= 4) {
+  if (caught) {
+    embed.description = "The boss is caught by the police\n"
+    embed.image = {url: "https://boss.igaryhe.io/img/catch.png"};
+  } else if (game!.history.length <= 3 && game!.visits >= 4) {
     embed.description = "The boss successfully escaped\n";
+    embed.image = {url: "https://boss.igaryhe.io/img/escape.png"};
   } else if (game!.history.length == 3 && game!.visits < 4) {
     embed.description = "The boss failed to escape\n";
+    embed.image = {url: "https://boss.igaryhe.io/img/loner.png"};
   }
 
   if (game?.barrier !== undefined) {
