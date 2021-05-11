@@ -66,5 +66,4 @@ export async function sendFollowup(id: string, content: string) {
     headers: headers,
     body: JSON.stringify({content: content, flags: 64}),
   });
-  response.json().then((data) => console.log(data));
 }

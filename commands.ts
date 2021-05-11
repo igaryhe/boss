@@ -64,12 +64,13 @@ function checkPlayer(interaction: Interaction, next: Next) {
 }
 
 function checkPlayerCount(_interaction: Interaction, next: Next) {
-  if (game!.players.size < roles.length) return next();
+  console.log(gameRoles.length);
+  if (gameRoles.length > 0) return next();
   res = response("5 players have joined the game", true);
 }
 
 function checkEnoughPlayer(_: Interaction, next: Next) {
-  if (game?.players.size === roles.length) return next();
+  if (gameRoles.length === 0) return next();
   res = response("Not enough players");
 }
 
@@ -248,7 +249,7 @@ function shuffle(array: Array<Role>) {
     array[currentIndex] = array[randomIndex];
     array[randomIndex] = temporaryValue;
   }
-  return array;
+  return JSON.parse(JSON.stringify(array));
 }
 
 function response(
