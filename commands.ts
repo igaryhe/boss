@@ -136,7 +136,10 @@ function reveal(_interaction: Interaction, _next: Next) {
   game?.updateHistory();
 
   game?.players.forEach((player) => {
-    if (player.role === Role.Boss) bossLoc = player.location;
+    if (player.role === Role.Boss) {
+      bossLoc = player.location
+      embed.image = {url: `https://boss.igaryhe.io/img/${bossLoc}.jpg`};
+    }
     fields.push({
       name: `${roleEmoji(player.role)} ${player.name}`,
       value: `${locationEmoji(player.location!)} ${player.location}`,
